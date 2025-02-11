@@ -13,7 +13,7 @@ Ten program przetwarza pliki HTML oraz JSON zawierające dane wiadomości z Face
 - Pliki HTML oraz JSON można pozyskać ze strony:  
 https://accountscenter.facebook.com/info_and_permissions/dyi
 
-- Drugi typ JSONa, zawierający zaszyfrowane wiadomości, jest dostępny stąd:  
+- Pliki JSON z zaszyfrowanymi wiadomościami można uzyskać stąd:  
 https://www.messenger.com/secure_storage/dyi
 
 # Instrukcja użycia
