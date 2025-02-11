@@ -1,4 +1,5 @@
 import os
+import json
 from bs4 import BeautifulSoup
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
@@ -31,8 +32,8 @@ def parse_date(date_str):
         hour += 12
     return datetime(year, mon, day, hour, minute, second)
 
-# Dynamiczne pobieranie plików HTML z bieżącego katalogu
-file = [f for f in os.listdir('.') if f.endswith('.html')]
+# Pobieramy pliki HTML oraz JSON z bieżącego katalogu
+file = [f for f in os.listdir('.') if f.endswith('.html') or f.endswith('.json')]
 names = {}
 total_words = 0
 words_per_sender = {}  # Nowy słownik dla liczby słów per nadawca
@@ -40,37 +41,67 @@ first_date = None
 last_date = None
 
 for f in file:
-    with open(f, "r", encoding="utf8") as page:
-        soup = BeautifulSoup(page, 'lxml')
-    # Iteruj po kontenerach wiadomości
-    messages = soup.find_all('div', class_='_a6-g')
-    for m in messages:
-        # Pobranie nadawcy
-        sender_tag = m.find('div', class_='_2ph_ _a6-h _a6-i')
-        if not sender_tag:
-            continue
-        sender = sender_tag.text.strip()
-        names[sender] = names.get(sender, 0) + 1
+    if f.endswith('.html'):
+        with open(f, "r", encoding="utf8") as page:
+            soup = BeautifulSoup(page, 'lxml')
+        # Iteruj po kontenerach wiadomości w HTML
+        messages = soup.find_all('div', class_='_a6-g')
+        for m in messages:
+            # Pobranie nadawcy
+            sender_tag = m.find('div', class_='_2ph_ _a6-h _a6-i')
+            if not sender_tag:
+                continue
+            sender = sender_tag.text.strip()
+            names[sender] = names.get(sender, 0) + 1
 
-        # Pobranie treści wiadomości i liczba słów
-        content_tag = m.find('div', class_='_2ph_ _a6-p')
-        if content_tag:
-            content = content_tag.text.strip()
-            word_count = len(content.split())
-            total_words += word_count
-            words_per_sender[sender] = words_per_sender.get(sender, 0) + word_count
+            # Pobranie treści wiadomości i liczba słów
+            content_tag = m.find('div', class_='_2ph_ _a6-p')
+            if content_tag:
+                content = content_tag.text.strip()
+                word_count = len(content.split())
+                total_words += word_count
+                words_per_sender[sender] = words_per_sender.get(sender, 0) + word_count
 
-        # Pobranie daty wiadomości
-        date_tag = m.find('div', class_='_a72d')
-        if date_tag:
-            try:
-                msg_date = parse_date(date_tag.text.strip())
-                if first_date is None or msg_date < first_date:
-                    first_date = msg_date
-                if last_date is None or msg_date > last_date:
-                    last_date = msg_date
-            except Exception as e:
-                pass  # ignoruj nieparsowalne daty
+            # Pobranie daty wiadomości
+            date_tag = m.find('div', class_='_a72d')
+            if date_tag:
+                try:
+                    msg_date = parse_date(date_tag.text.strip())
+                    if first_date is None or msg_date < first_date:
+                        first_date = msg_date
+                    if last_date is None or msg_date > last_date:
+                        last_date = msg_date
+                except Exception as e:
+                    pass  # ignoruj nieparsowalne daty
+    elif f.endswith('.json'):
+        with open(f, "r", encoding="utf8") as page:
+            data = json.load(page)
+        # Iteruj po wiadomościach z JSON
+        if "messages" in data:
+            for msg in data["messages"]:
+                sender = msg.get("sender_name")
+                if not sender:
+                    continue
+                # Konwersja sender_name na polskie znaki
+                try:
+                    sender = sender.encode('latin-1').decode('utf-8')
+                except Exception:
+                    pass
+                names[sender] = names.get(sender, 0) + 1
+                content = msg.get("content", "")
+                word_count = len(content.split())
+                total_words += word_count
+                words_per_sender[sender] = words_per_sender.get(sender, 0) + word_count
+                # Przetwórz datę z timestamp_ms
+                if "timestamp_ms" in msg:
+                    try:
+                        msg_date = datetime.fromtimestamp(msg["timestamp_ms"] / 1000)
+                        if first_date is None or msg_date < first_date:
+                            first_date = msg_date
+                        if last_date is None or msg_date > last_date:
+                            last_date = msg_date
+                    except Exception as e:
+                        pass
 
 # Sortowanie i filtrowanie nadawców
 sorted_names = dict(sorted(names.items(), key=lambda item: item[1], reverse=True))
@@ -94,7 +125,8 @@ if first_date and last_date:
     print("Pierwsza wiadomość:", first_date.strftime('%Y-%m-%d %H:%M:%S'))
     print("Ostatnia wiadomość:", last_date.strftime('%Y-%m-%d %H:%M:%S'))
     diff = last_date - first_date
-    print("Czas między pierwszą a ostatnią wiadomością:", diff)
+    diff_adjusted = timedelta(seconds=int(diff.total_seconds()))
+    print("Czas między pierwszą a ostatnią wiadomością:", diff_adjusted)
 
 # Dodaj histogram dla danych
 plt.figure(figsize=(10, 6))
