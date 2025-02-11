@@ -6,6 +6,9 @@ from datetime import datetime, timedelta
 
 cut_off = 10  # Minimalna liczba wiadomości, aby zostać uwzględnionym w wynikach
 
+# Dodaj zapis czasu startu przed rozpoczęciem przetwarzania plików
+start_time = datetime.now()
+
 # Funkcja pomocnicza do parsowania daty
 def parse_date(date_str):
     # Wykryj, czy tekst zawiera frazy określające porę dnia
@@ -36,7 +39,9 @@ def parse_date(date_str):
 file = [f for f in os.listdir('.') if f.endswith('.html') or f.endswith('.json')]
 names = {}
 total_words = 0
-words_per_sender = {}  # Nowy słownik dla liczby słów per nadawca
+words_per_sender = {}      # Liczba słów per nadawca
+images_per_sender = {}     # Liczba zdjęć per nadawca
+videos_per_sender = {}     # Liczba filmów per nadawca
 first_date = None
 last_date = None
 
@@ -62,6 +67,12 @@ for f in file:
                 total_words += word_count
                 words_per_sender[sender] = words_per_sender.get(sender, 0) + word_count
 
+            # Zlicz przesłane media w HTML: zdjęcia i filmy
+            img_tags = m.find_all("img", class_="_a6_o _3-96")
+            video_tags = m.find_all("video", class_="_a6_o _3-96")
+            images_per_sender[sender] = images_per_sender.get(sender, 0) + len(img_tags)
+            videos_per_sender[sender] = videos_per_sender.get(sender, 0) + len(video_tags)
+
             # Pobranie daty wiadomości
             date_tag = m.find('div', class_='_a72d')
             if date_tag:
@@ -79,23 +90,43 @@ for f in file:
         # Iteruj po wiadomościach z JSON
         if "messages" in data:
             for msg in data["messages"]:
-                sender = msg.get("sender_name")
+                # Pobierz nadawcę, obsługując oba warianty kluczy
+                sender = msg.get("sender_name") or msg.get("senderName")
                 if not sender:
                     continue
-                # Konwersja sender_name na polskie znaki
                 try:
                     sender = sender.encode('latin-1').decode('utf-8')
                 except Exception:
                     pass
                 names[sender] = names.get(sender, 0) + 1
-                content = msg.get("content", "")
+                # Pobierz treść wiadomości, używając "content" lub "text"
+                content = msg.get("content") or msg.get("text", "")
                 word_count = len(content.split())
                 total_words += word_count
                 words_per_sender[sender] = words_per_sender.get(sender, 0) + word_count
-                # Przetwórz datę z timestamp_ms
-                if "timestamp_ms" in msg:
+
+                # Zlicz media z JSON oddzielnie dla zdjęć i filmów
+                img_count = 0
+                vid_count = 0
+                if "photos" in msg:
+                    img_count += len(msg.get("photos", []))
+                if "videos" in msg:
+                    vid_count += len(msg.get("videos", []))
+                if "media" in msg:
+                    for mitem in msg.get("media", []):
+                        uri = mitem.get("uri", "").lower()
+                        if uri.endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                            img_count += 1
+                        elif uri.endswith(('.mp4', '.mov', '.avi', '.webm')):
+                            vid_count += 1
+                images_per_sender[sender] = images_per_sender.get(sender, 0) + img_count
+                videos_per_sender[sender] = videos_per_sender.get(sender, 0) + vid_count
+
+                # Przetwórz datę - sprawdź "timestamp_ms" lub "timestamp"
+                timestamp = msg.get("timestamp_ms") or msg.get("timestamp")
+                if timestamp:
                     try:
-                        msg_date = datetime.fromtimestamp(msg["timestamp_ms"] / 1000)
+                        msg_date = datetime.fromtimestamp(timestamp / 1000)
                         if first_date is None or msg_date < first_date:
                             first_date = msg_date
                         if last_date is None or msg_date > last_date:
@@ -108,25 +139,38 @@ sorted_names = dict(sorted(names.items(), key=lambda item: item[1], reverse=True
 # Filtruj wyniki, ignorując te o wartościach mniejszych niż cut_off
 filtered_names = {k: v for k, v in sorted_names.items() if v >= cut_off}
 
-# Po filtrowaniu danych usuń poprzednie wydruki i dodaj: 
-print("\nStatystyki:")
+# Dodajemy sortowanie nadawców dla wyświetlania tabeli
 sorted_senders = sorted(filtered_names.keys(), key=lambda s: words_per_sender.get(s, 0), reverse=True)
+
+# Drukowanie wyrównanej tabelki z dodatkowymi kolumnami "Zdjęcia" i "Wideo":
+print("\nStatystyki:")
+header = "{:>3} | {:<25} | {:>10} | {:>10} | {:>8} | {:>7} | {:>10}".format("Lp", "Nadawca", "Wiadomości", "Słowa", "Zdjęcia", "Wideo", "% udziału")
+print(header)
+print("-" * len(header))
 i = 1
 for sender in sorted_senders:
     msgs = filtered_names[sender]
     sender_words = words_per_sender.get(sender, 0)
+    img_count = images_per_sender.get(sender, 0)
+    vid_count = videos_per_sender.get(sender, 0)
     percentage = (sender_words / total_words * 100) if total_words > 0 else 0
-    print(f"{i}. {sender}: {msgs} wiadomości, słowa: {sender_words}, czyli {percentage:.2f} % udziału")
+    print("{:>3} | {:<25} | {:>10} | {:>10} | {:>8} | {:>7} | {:>9.2f}%".format(i, sender, msgs, sender_words, img_count, vid_count, percentage))
     i += 1
 
-# Wyświetl licznik słów oraz informacje o datach wiadomości
-print("\nŁączna liczba słów:", total_words)
+# Wyświetl licznik wiadomości i słów oraz informacje o datach wiadomości
+total_messages = sum(filtered_names.values())
+print("\nŁączna liczba wiadomości:", total_messages)
+print("Łączna liczba słów:", total_words)
 if first_date and last_date:
     print("Pierwsza wiadomość:", first_date.strftime('%Y-%m-%d %H:%M:%S'))
     print("Ostatnia wiadomość:", last_date.strftime('%Y-%m-%d %H:%M:%S'))
     diff = last_date - first_date
     diff_adjusted = timedelta(seconds=int(diff.total_seconds()))
     print("Czas między pierwszą a ostatnią wiadomością:", diff_adjusted)
+
+# Po zakończeniu całego przetwarzania:
+processing_time = datetime.now() - start_time
+print(f"\nPrzetworzono {len(file)} plików w ciągu {processing_time}")
 
 # Dodaj histogram dla danych
 plt.figure(figsize=(10, 6))
