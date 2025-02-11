@@ -1,6 +1,6 @@
 # Analiza wiadomości
 
-Ten program przetwarza pliki HTML oraz JSON zawierające dane wiadomości z Facebooka i Messengera. Działa w następujący sposób:
+Program przetwarza pliki HTML oraz JSON zawierające dane wiadomości z Messengera. Działa w następujący sposób:
 - Ładuje pliki HTML i JSON z bieżącego katalogu.
 - Parsuje dane, wyodrębniając nadawców, treść wiadomości, liczbę słów, zdjęcia, filmy oraz daty wiadomości.
 - Agreguje statystyki dotyczące liczby wiadomości, słów, zdjęć i filmów dla każdego nadawcy.
@@ -19,18 +19,20 @@ https://www.messenger.com/secure_storage/dyi
 # Instrukcja użycia
 
 1. Umieść pliki HTML/JSON w katalogu projektu.
-2. Uruchom program `messCounter.py`.
-3. Przejrzyj wygenerowane statystyki oraz histogram.
+2. Zainstaluj zależności poleceniem:  
+   pip install -r requirements.txt
+3. Uruchom program `messCounter.py`.
+4. Przejrzyj wygenerowane statystyki oraz histogram.
 
 ## Przykładowy output
 
 Statystyki:
 ```
-  Lp | Nadawca                  | Wiadomości |    Słowa | Zdjęcia | Wideo |  % udziału
+  Lp | Nadawca                  | Wiadomości | Zdjęcia | Wideo |    Słowa |  % udziału
 --------------------------------------------------------------------------------------
-  1  | Jan Kowalski             |         45 |      300 |      10 |     2 |   20.00%
-  2  | Anna Nowak               |         32 |      250 |       8 |     1 |   16.67%
-  3  | Piotr Wiśniewski         |         25 |      180 |       5 |     0 |   12.00%
+  1  | Jan Kowalski             |         45 |      10 |     2 |      300 |   20.00%
+  2  | Anna Nowak               |         32 |       8 |     1 |      250 |   16.67%
+  3  | Piotr Wiśniewski         |         25 |       5 |     0 |      180 |   12.00%
 ```
 
 Łączna liczba wiadomości: 102  

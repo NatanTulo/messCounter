@@ -144,17 +144,21 @@ sorted_senders = sorted(filtered_names.keys(), key=lambda s: words_per_sender.ge
 
 # Drukowanie wyrównanej tabelki z dodatkowymi kolumnami "Zdjęcia" i "Wideo":
 print("\nStatystyki:")
-header = "{:>3} | {:<25} | {:>10} | {:>10} | {:>8} | {:>7} | {:>10}".format("Lp", "Nadawca", "Wiadomości", "Słowa", "Zdjęcia", "Wideo", "% udziału")
+header = "{:>3} | {:<25} | {:>10} | {:>8} | {:>7} | {:>10} | {:>10}".format(
+    "Lp", "Nadawca", "Wiadomości", "Zdjęcia", "Wideo", "Słowa", "% udziału"
+)
 print(header)
 print("-" * len(header))
 i = 1
 for sender in sorted_senders:
     msgs = filtered_names[sender]
-    sender_words = words_per_sender.get(sender, 0)
     img_count = images_per_sender.get(sender, 0)
     vid_count = videos_per_sender.get(sender, 0)
+    sender_words = words_per_sender.get(sender, 0)
     percentage = (sender_words / total_words * 100) if total_words > 0 else 0
-    print("{:>3} | {:<25} | {:>10} | {:>10} | {:>8} | {:>7} | {:>9.2f}%".format(i, sender, msgs, sender_words, img_count, vid_count, percentage))
+    print("{:>3} | {:<25} | {:>10} | {:>8} | {:>7} | {:>10} | {:>9.2f}%".format(
+        i, sender, msgs, img_count, vid_count, sender_words, percentage
+    ))
     i += 1
 
 # Wyświetl licznik wiadomości i słów oraz informacje o datach wiadomości

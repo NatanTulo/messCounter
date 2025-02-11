@@ -1,0 +1,7 @@
+/Include
+/Lib
+/pyvenv.cfg
+/Scripts
+/share
+*.html
+*.json
