@@ -1,5 +1,8 @@
 import os
 import json
+import sys
+import re
+import shutil
 from bs4 import BeautifulSoup
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
@@ -8,6 +11,9 @@ cut_off = 10  # Minimalna liczba wiadomości, aby zostać uwzględnionym w wynik
 
 # Dodaj zapis czasu startu przed rozpoczęciem przetwarzania plików
 start_time = datetime.now()
+
+# Utwórz słownik do zbierania plików multimedialnych znalezionych w JSON
+sender_media = {}
 
 # Funkcja pomocnicza do parsowania daty
 def parse_date(date_str):
@@ -35,8 +41,9 @@ def parse_date(date_str):
         hour += 12
     return datetime(year, mon, day, hour, minute, second)
 
-# Pobieramy pliki HTML oraz JSON z bieżącego katalogu
-file = [f for f in os.listdir('.') if f.endswith('.html') or f.endswith('.json')]
+# Zamiast przeszukiwania bieżącego katalogu, wyszukujemy pliki w folderze 'data'
+data_folder = "data"
+file = [f for f in os.listdir(data_folder) if f.endswith('.html') or f.endswith('.json')]
 names = {}
 total_words = 0
 words_per_sender = {}      # Liczba słów per nadawca
@@ -47,7 +54,7 @@ last_date = None
 
 for f in file:
     if f.endswith('.html'):
-        with open(f, "r", encoding="utf8") as page:
+        with open(os.path.join(data_folder, f), "r", encoding="utf8") as page:
             soup = BeautifulSoup(page, 'lxml')
         # Iteruj po kontenerach wiadomości w HTML
         messages = soup.find_all('div', class_='_a6-g')
@@ -85,7 +92,7 @@ for f in file:
                 except Exception as e:
                     pass  # ignoruj nieparsowalne daty
     elif f.endswith('.json'):
-        with open(f, "r", encoding="utf8") as page:
+        with open(os.path.join(data_folder, f), "r", encoding="utf8") as page:
             data = json.load(page)
         # Iteruj po wiadomościach z JSON
         if "messages" in data:
@@ -114,7 +121,11 @@ for f in file:
                     vid_count += len(msg.get("videos", []))
                 if "media" in msg:
                     for mitem in msg.get("media", []):
-                        uri = mitem.get("uri", "").lower()
+                        uri = mitem.get("uri", "")
+                        # Jeżeli wartość uri pochodzi z folderu media, zapisz nazwę pliku
+                        if uri.startswith("./media/"):
+                            file_name = os.path.basename(uri)
+                            sender_media.setdefault(sender, set()).add(file_name)
                         if uri.endswith(('.jpg', '.jpeg', '.png', '.gif')):
                             img_count += 1
                         elif uri.endswith(('.mp4', '.mov', '.avi', '.webm')):
@@ -184,3 +195,20 @@ plt.title('Histogram liczby wiadomości')
 plt.xticks(rotation=45, ha='right')
 plt.tight_layout()
 plt.show()
+
+# Jeśli przekazano parametr -s, przenieś pliki multimedialne znalezione w JSON do folderu nadawcy
+if "-s" in sys.argv:
+    media_path = os.path.join(data_folder, "media")
+    for sender, files_set in sender_media.items():
+        sender_folder = os.path.join(media_path, sender)
+        if not os.path.exists(sender_folder):
+            os.makedirs(sender_folder)
+        for file_name in files_set:
+            src = os.path.join(media_path, file_name)
+            dst = os.path.join(sender_folder, file_name)
+            if os.path.exists(src):
+                print(f"Przenoszenie {src} do {dst}")
+                shutil.move(src, dst)
+            else:
+                print(f"Nie znaleziono pliku {src}")
+    print("Pliki multimedialne poukładane według nadawcy.")
